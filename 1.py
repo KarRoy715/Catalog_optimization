@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 import os
 
-input_dir = Path("/mnt/nfs_dev/000-Data_hub/book-3-procrssed/ocr_md/JD_V2")
+input_dir = Path("/mnt/nfs_dev/zah/data/book")
 files = sorted([f for f in input_dir.rglob("*.md") if 'debug' not in f.parts])
 print(files)
 
@@ -46,7 +46,7 @@ def extract_toc_robust(file_path):
             start_idx = i
             break
             
-    if start_idx == -1: return "False"
+    if start_idx == -1: return "False", None, None, file_path
 
     # --- 阶段 1: 采样前 5-8 行有效标题作为锚点集合 ---
     anchor_set = []
@@ -127,10 +127,10 @@ def extract_toc_robust(file_path):
     # --- 阶段 3: 返回截取结果 ---
     if end_idx != -1:
         # 如果是分行标题，end_idx 可能是标题的第二行，视情况可以向上调1行
-        return lines[start_idx:end_idx]
+        return lines[start_idx:end_idx], start_idx, end_idx, file_path
     else:
         # 极端情况兜底：取目录开始后的300行
-        return "False"
+        return "False", None, None
     
 
 def auto_detect_hierarchy(md_content):
@@ -207,53 +207,54 @@ false_md = []
 toc_list = []
 for i in range(len(files)):
     if not (is_english_file(files[i])):
-        toc_blocks = extract_toc_robust(files[i])
-        [block for block in toc_blocks if len(block) <= 100]
+        toc_blocks, start_idx, end_idx, file_path = extract_toc_robust(files[i])
         if toc_blocks == "False":
-            false_md.append(files[i]) 
+            false_md.append(files[i])
         else:
             if toc_blocks == "False":
                 false_md.append(files[i]) 
             else:
+                toc_blocks = [block for block in toc_blocks if len(block) <= 50]
                 print(f"------------------------{i}--------------------------")
                 print(toc_blocks)
-                toc_list.append(toc_blocks)
+                toc_list.append((toc_blocks, start_idx, end_idx, file_path))
     else:
         pass
         # TODO：处理英文
 print(false_md)
 
-# i = 92
-# if not (is_english_file(files[i])):
-#     toc_blocks = extract_toc_robust(files[i])
-#     toc_blocks = [block for block in toc_blocks if len(block) <= 50]
-#     if toc_blocks == "False":
-#         false_md.append(files[i]) 
-#     else: 
-#         if toc_blocks == "False":
-#             false_md.append(files[i]) 
-#         else:
-#             print(f"------------------------{i}--------------------------")
-#             print(toc_blocks)
-#             toc_list.append(toc_blocks)
-# else:
-#     pass
-#     # TODO：处理英文
-# print(false_md)
-# auto_detect_hierarchy(toc_blocks)
 
-with open("output_result.txt", "w", encoding="utf-8") as f:
-    for idx, toc in enumerate(toc_list):
-        output = auto_detect_hierarchy(toc_list[idx])
-        
-        # 2. 打印到控制台 (保持原本的显示效果)
-        print(f"-------------------------------{idx}------------------------")
-        print(output)
-        print("*"*100)
-        
-        # 3. 同时写入到文件 (关键步骤：加上 file=f)
-        print(f"-------------------------------{idx}------------------------", file=f)
-        print(output, file=f)
-        print("*"*100, file=f)
+# def rewrite_md(processwd_toc, start_idx, end_idx, file_path):
+#     with open(file_path, 'r', encoding='utf-8') as f:
+#         lines = f.readlines()
+#         for line in lines
 
+        
+
+processed_toc_list = []
+for idx, toc in enumerate(toc_list):
+    toc_content, start_idx, end_idx, file_path = toc
+    processed_toc = auto_detect_hierarchy(toc_content)
+    processed_toc_list.append((processed_toc, start_idx, end_idx, file_path))
+for idx, item in enumerate(processed_toc_list):
+    processwd_toc, start_idx, end_idx, file_path = item
+    rewrite_md(processwd_toc, start_idx, end_idx, file_path)
+
+
+
+# with open("output_result.txt", "w", encoding="utf-8") as f:
+#     for idx, toc in enumerate(toc_list):
+#         toc_content, start_idx, end_idx = toc
+#         output = auto_detect_hierarchy(toc_content)
+        
+#         # 2. 打印到控制台 (保持原本的显示效果)
+#         print(f"-------------------------------{idx}------------------------")
+#         print(output)
+#         print("*"*100)
+        
+#         # 3. 同时写入到文件 (关键步骤：加上 file=f)
+#         print(f"-------------------------------{idx}------------------------", file=f)
+#         print(output, file=f)
+#         print("*"*100, file=f)
+# 
 # print("✅ 数据已成功保存到 output_result.txt")
